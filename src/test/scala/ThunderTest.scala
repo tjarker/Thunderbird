@@ -32,7 +32,7 @@ class ThunderTester(dut: Thunderbird) extends PeekPokeTester(dut){
 
 class ThunderTest extends FlatSpec with Matchers{
   "Thunderbird" should "pass" in {
-    chisel3.iotesters.Driver(() => new Thunderbird) {
+    chisel3.iotesters.Driver(() => new Thunderbird(0)) {
       c => new ThunderTester(c)
     } should be(true)
   }

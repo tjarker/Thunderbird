@@ -1,8 +1,8 @@
 import chisel3._
 import chisel3.util._
+import lib._
 
-
-class Thunderbird extends Module{
+class Thunderbird(clockDiv: Int) extends Module{
   val io = IO(new Bundle{
     val L = Input(Bool())
     val R = Input(Bool())
@@ -12,76 +12,105 @@ class Thunderbird extends Module{
     val Ro = Output(UInt(3.W))
   })
 
+  // synchronize inputs
+  val L = synchronize(io.L)
+  val R = synchronize(io.R)
+  val H = synchronize(io.H)
+  val B = synchronize(io.B)
+
+  // clock divider
+  val tick = tickGen(clockDiv)
+
+  // states and state register
   val idle :: leftTurn :: rightTurn :: hazard :: Nil = Enum(4)
   val stateReg = RegInit(idle)
+  val nextState = WireDefault(idle)
+  when(tick){
+    stateReg := nextState
+  }
 
+  // register for turn sequence
   val turnReg = RegInit(0.U(3.W))
+  val allLow = WireDefault("b000".U)
+  val allHigh = WireDefault("b111".U)
 
-  io.Lo := "b000".U
-  io.Ro := "b000".U
+  // default output assignment
+  io.Lo := allLow
+  io.Ro := allLow
 
-  when(stateReg === rightTurn || stateReg === leftTurn){
-    turnReg := turnReg(1, 0) ## 1.U(1.W)
-    when(turnReg === 7.U) {
-      turnReg := 0.U
+  // turn sequence register control
+  when(tick && (stateReg === rightTurn || stateReg === leftTurn)){
+    turnReg := turnReg(1, 0) ## 1.U(1.W) // shift left and insert 1 at lsb
+    when(turnReg === allHigh) {
+      turnReg := allLow
     }
   }
 
+  // state control
   switch(stateReg) {
     is(idle) {
-      when(io.H) {
-        stateReg := hazard
-      }.elsewhen(io.R) {
-        stateReg := rightTurn
-      }.elsewhen(io.L) {
-        stateReg := leftTurn
+      when(H) {
+        nextState := hazard
+      }.elsewhen(R) {
+        nextState := rightTurn
+      }.elsewhen(L) {
+        nextState := leftTurn
       }.otherwise {
-        stateReg := idle
+        nextState := idle
       }
     }
     is(leftTurn) {
-      when(io.H) {
-        stateReg := hazard
-      }.elsewhen(!io.L) {
-        stateReg := idle
+      when(H) {
+        nextState := hazard
+      }.elsewhen(!L) {
+        nextState := idle
       }.otherwise {
-        stateReg := leftTurn
+        nextState := leftTurn
       }
     }
     is(rightTurn) {
-      when(io.H) {
-        stateReg := hazard
-      }.elsewhen(!io.R) {
-        stateReg := idle
+      when(H) {
+        nextState := hazard
+      }.elsewhen(!R) {
+        nextState := idle
       }.otherwise {
-        stateReg := rightTurn
+        nextState := rightTurn
       }
     }
     is(hazard) {
-      stateReg := idle
+      nextState := idle
     }
   }
 
+  // output control
   switch(stateReg) {
     is(idle) {
       turnReg := 0.U
-      when(!io.H && io.B){
-        io.Lo := "b111".U
-        io.Ro := "b111".U
+      when(!H && B){
+        io.Lo := allHigh
+        io.Ro := allHigh
       }
     }
     is(leftTurn) {
       io.Lo := turnReg
-      when(io.B){
-        io.Ro
+      when(B){
+        io.Ro := allHigh
       }
     }
     is(rightTurn) {
-      io.Ro := Reverse(turnReg)
+      io.Ro := turnReg
+      when(B){
+        io.Lo := allHigh
+      }
     }
     is(hazard) {
-      io.Lo := "b111".U
-      io.Ro := "b111".U
+      io.Lo := allHigh
+      io.Ro := allHigh
     }
   }
+}
+
+// generate Verilog
+object Thunderbird extends App {
+  chisel3.Driver.execute(args, () => new Thunderbird(16777216))
 }
