@@ -2,6 +2,19 @@ import chisel3._
 import chisel3.util._
 import lib._
 
+object lib {
+  def tickGen(max: Int): Bool = {
+    if(max==0){
+      return WireDefault(true.B)
+    }else{
+      val ticker = RegInit(0.U(log2Ceil(max).W))
+      val tick = ticker === (max-1).U
+      ticker := Mux(tick, 0.U, ticker + 1.U)
+      return tick
+    }
+  }
+}
+
 class Thunderbird(clockDiv: Int) extends Module{
   val io = IO(new Bundle{
     val L = Input(Bool())
@@ -13,10 +26,10 @@ class Thunderbird(clockDiv: Int) extends Module{
   })
 
   // synchronize inputs
-  val L = synchronize(io.L)
-  val R = synchronize(io.R)
-  val H = synchronize(io.H)
-  val B = synchronize(io.B)
+  val L = RegNext(io.L)
+  val R = RegNext(io.R)
+  val H = RegNext(io.H)
+  val B = RegNext(io.B)
 
   // clock divider
   val tick = tickGen(clockDiv)
