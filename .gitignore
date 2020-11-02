@@ -7,5 +7,4 @@ target/
 test_run_dir/
 vivado/
 *.anno.json
-*.v
 *.fir
