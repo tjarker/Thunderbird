@@ -111,7 +111,7 @@ class Thunderbird(clockDiv: Int) extends Module{
       }
     }
     is(rightTurn) {
-      io.Ro := turnReg
+      io.Ro := Reverse(turnReg)
       when(B){
         io.Lo := allHigh
       }

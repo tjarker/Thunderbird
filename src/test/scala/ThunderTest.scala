@@ -1,39 +1,111 @@
-import chisel3.iotesters.PeekPokeTester
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
+import org.scalatest.FreeSpec
+import chisel3._
 
-class ThunderTester(dut: Thunderbird) extends PeekPokeTester(dut){
-  poke(dut.io.H, 0)
-  poke(dut.io.L, 0)
-  poke(dut.io.R, 0)
-  poke(dut.io.B, 0)
-  step(1)
-  println("Testing blink left:")
-  poke(dut.io.L,1)
-  for(i <- 0 until 8){
-    println(s"${peek(dut.io.Lo).toInt.toBinaryString.reverse.padTo(3,'0').reverse} | ${peek(dut.io.Ro).toInt.toBinaryString.padTo(3,'0')}")
-    step(1)
-  }
-  println("Testing blink right:")
-  poke(dut.io.L,0)
-  poke(dut.io.R,1)
-  for(i <- 0 until 8){
-    println(s"${peek(dut.io.Lo).toInt.toBinaryString.reverse.padTo(3,'0').reverse} | ${peek(dut.io.Ro).toInt.toBinaryString.padTo(3,'0')}")
-    step(1)
-  }
-  println("Testing hazard:")
-  poke(dut.io.L,1)
-  poke(dut.io.H,1)
-  for(i <- 0 until 8){
-    println(s"${peek(dut.io.Lo).toInt.toBinaryString.padTo(3,'0')} | ${peek(dut.io.Ro).toInt.toBinaryString.padTo(3,'0')}")
-    step(1)
-  }
-}
+class ThunderTester extends FreeSpec with ChiselScalatestTester{
 
-
-class ThunderTest extends FlatSpec with Matchers{
-  "Thunderbird" should "pass" in {
-    chisel3.iotesters.Driver(() => new Thunderbird(0)) {
-      c => new ThunderTester(c)
-    } should be(true)
+  def readBin(port: UInt) : Int = {
+    port.peek.litValue.toString(2).toInt
   }
+
+  "Thunderbird should blink left" in {
+    test(new Thunderbird(0)){ dut =>
+
+      println("Left turn sequence:")
+
+      val seq = Seq(0x00,0x01,0x03,0x07)
+
+      // initialize inputs
+      dut.io.H.poke(false.B)
+      dut.io.B.poke(false.B)
+      dut.io.R.poke(false.B)
+
+      dut.io.L.poke(true.B)
+
+      dut.clock.step(1)
+
+      for(i <- 0 until 10) {
+        println("%03d | %03d".format(readBin(dut.io.Lo),readBin(dut.io.Ro)))
+        dut.clock.step(1)
+        dut.io.Lo.expect(seq(i%4).U)
+        dut.io.Ro.expect(0.U)
+      }
+    }
+  }
+
+  "Thunderbird should blink right" in {
+    test(new Thunderbird(0)){ dut =>
+
+      println("Right turn sequence:")
+
+      val seq = Seq(0x00,0x04,0x06,0x07)
+
+      // initialize inputs
+      dut.io.H.poke(false.B)
+      dut.io.B.poke(false.B)
+      dut.io.L.poke(false.B)
+
+      dut.io.R.poke(true.B)
+
+      dut.clock.step(1)
+
+      for(i <- 0 until 10) {
+        println("%03d | %03d".format(readBin(dut.io.Lo),readBin(dut.io.Ro)))
+        dut.clock.step(1)
+        dut.io.Ro.expect(seq(i%4).U)
+        dut.io.Lo.expect(0.U)
+      }
+    }
+  }
+
+  "Thunderbird should show hazard" in {
+    test(new Thunderbird(0)){ dut =>
+
+      println("Hazard sequence:")
+
+      val seq = Seq(0x00,0x07)
+
+      // initialize inputs
+      dut.io.R.poke(false.B)
+      dut.io.B.poke(false.B)
+      dut.io.L.poke(false.B)
+
+      dut.io.H.poke(true.B)
+
+      dut.clock.step(1)
+
+      for(i <- 0 until 10) {
+        println("%03d | %03d".format(readBin(dut.io.Lo),readBin(dut.io.Ro)))
+        dut.io.Ro.expect(seq(i%2).U)
+        dut.io.Lo.expect(seq(i%2).U)
+        dut.clock.step(1)
+      }
+    }
+  }
+
+  "Thunderbird should show brake under left Turn" in {
+    test(new Thunderbird(0)){ dut =>
+
+      println("Brake under left turn sequence:")
+
+      val seq = Seq(0x00,0x01,0x03,0x07)
+
+      // initialize inputs
+      dut.io.H.poke(false.B)
+      dut.io.R.poke(false.B)
+
+      dut.io.B.poke(true.B)
+      dut.io.L.poke(true.B)
+
+      dut.clock.step(1)
+
+      for(i <- 0 until 10) {
+        println("%03d | %03d".format(readBin(dut.io.Lo),readBin(dut.io.Ro)))
+        dut.clock.step(1)
+        dut.io.Lo.expect(seq(i%4).U)
+        dut.io.Ro.expect(7.U)
+      }
+    }
+  }
+
 }
