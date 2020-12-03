@@ -2,7 +2,7 @@ import chiseltest._
 import org.scalatest.FreeSpec
 import chisel3._
 
-class ThunderTester extends FreeSpec with ChiselScalatestTester{
+class ThunderTest extends FreeSpec with ChiselScalatestTester{
 
   def readBin(port: UInt) : Int = {
     port.peek.litValue.toString(2).toInt
