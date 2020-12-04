@@ -2,6 +2,7 @@ import chisel3._
 import chisel3.util._
 import lib._
 
+// some small hardware generating functions
 object lib {
   def tickGen(max: Int): Bool = {
     if(max==0){
@@ -15,6 +16,7 @@ object lib {
   }
 }
 
+// the main Thunderbird fsm
 class Thunderbird(clockDiv: Int) extends Module{
   val io = IO(new Bundle{
     val L = Input(Bool())
